@@ -53,6 +53,14 @@ The client can be run on any of the [supported platforms](https://docs.fyne.io/s
     ```bash
     go build
     ```
+    
+#### Alternatively you can cross compile using [fyne-cross](https://docs.fyne.io/started/cross-compiling.html)
+
+For example:
+
+```bash
+fyne-cross android -app-id dev.ibanks.opendeck -icon Icon.png -name OpenDeck
+```
 
 ## Contributing
 
