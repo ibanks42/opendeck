@@ -45,10 +45,14 @@ The client can be run on any of the [supported platforms](https://docs.fyne.io/s
 2. **Navigate to the project directory:**
 
     ```bash
-    cd opendeck
+    cd opendeck/client
     ```
+    or
+   ```bash
+   cd opendeck/server
+   ```
 
-3. **Build the application:**
+4. **Build the application:**
 
     ```bash
     go build
