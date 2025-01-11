@@ -3,9 +3,6 @@ package main
 import (
 	_ "embed"
 	"fmt"
-	"log"
-	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -33,12 +30,6 @@ var (
 )
 
 func main() {
-	_, err := exec.LookPath("bun")
-	path := os.Getenv("PATH")
-	if err != nil {
-		log.Fatal("Couldn't find bun in path. Make sure you have it installed: https://bun.sh\n\n", err, "\n\n", path)
-	}
-
 	fyneApp = app.NewWithID("dev.ibanks.opendesk-server")
 	window = fyneApp.NewWindow("OpenDesk Server")
 	preferences = fyneApp.Preferences()
