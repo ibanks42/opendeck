@@ -29,10 +29,10 @@ The client can be run on any of the [supported platforms](https://docs.fyne.io/s
 
 ### Prerequisites
 
-* **Go:** Ensure you have Go installed. You can download it from the official website: [https://go.dev/](https://www.google.com/url?sa=E&source=gmail&q=https://go.dev/)
+* **Go:** Ensure you have Go installed. You can download it from the official website: [https://go.dev/](https://go.dev/)
 * **Fyne:** Install the Fyne toolkit: [https://fyne.io/](https://docs.fyne.io/started/)
 
-* **Bun:**  Download and install Bun from: [https://bun.sh/](https://www.google.com/url?sa=E&source=gmail&q=https://bun.sh/)
+* **Bun:**  Download and install Bun from: [https://bun.sh/](https://bun.sh/)
 
 ### Build from Source
 
