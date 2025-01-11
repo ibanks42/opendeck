@@ -25,7 +25,10 @@ func getScripts() []string {
 	tasks := []string{}
 
 	for _, file := range files {
-		tasks = append(tasks, file.Name())
+		ext := filepath.Ext(file.Name())
+		if ext == ".ts" || ext == ".js" {
+			tasks = append(tasks, file.Name())
+		}
 	}
 	return tasks
 }
