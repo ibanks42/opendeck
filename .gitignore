@@ -24,3 +24,5 @@ server/opendeck-server
 server/opendeck.db
 /server/fyne-cross
 /client/fyne-cross
+
+/**/*/scripts/**/*

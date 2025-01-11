@@ -1,9 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 func getScripts() []string {
@@ -47,4 +53,29 @@ func writeScript(file, data string) error {
 	script := filepath.Join(path, "scripts", file)
 
 	return os.WriteFile(script, []byte(data), 0644)
+}
+
+func executeScript(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+
+	path := filepath.Dir(exe)
+	script, err := url.PathUnescape(filepath.Join(path, "scripts", id))
+	if err != nil {
+		return err
+	}
+
+	proc := exec.Command("bun", "run", script)
+
+	output, err := proc.Output()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return err
+	}
+
+	return c.SendString(strings.TrimSpace(string(output)))
 }
