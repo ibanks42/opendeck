@@ -99,7 +99,16 @@ func buildScriptsTab() {
 		buildScriptsTab()
 	})
 	close_btn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() { os.Exit(0) })
-	btn_box := container.NewHBox(close_btn, layout.NewSpacer(), connection_lbl, layout.NewSpacer(), refresh_btn)
+	btn_box := container.New(
+		layout.NewCustomPaddedLayout(0, 0, 4, 4),
+		container.NewHBox(
+			close_btn,
+			layout.NewSpacer(),
+			connection_lbl,
+			layout.NewSpacer(),
+			refresh_btn,
+		),
+	)
 
 	// create task list
 	var containers []fyne.CanvasObject
@@ -124,9 +133,10 @@ func buildScriptsTab() {
 		containers = append(containers, container.New(layout, button))
 	}
 
-	grid := container.NewGridWrap(fyne.NewSize(256, 256), containers...)
+	grid := container.NewGridWrap(fyne.NewSize(224, 224), containers...)
+	scroll := container.NewVScroll(grid)
 
-	tabs.Items[0].Content = container.NewVBox(grid, layout.NewSpacer(), btn_box)
+	tabs.Items[0].Content = container.NewBorder(btn_box, nil, nil, nil, scroll)
 }
 
 func buildSettingsTab() {
