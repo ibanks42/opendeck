@@ -31,7 +31,11 @@ func StartServer() {
 			for i, v := range scripts {
 				scripts[i].File = strings.Replace(v.File, filepath.Ext(v.File), "", 0)
 			}
-			return c.JSON(getScripts())
+			var out []string
+			for _, v := range scripts {
+				out = append(out, v.File)
+			}
+			return c.JSON(out)
 		})
 		fiberApp.Get("/scripts/:id", executeScript)
 
