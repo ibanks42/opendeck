@@ -82,6 +82,7 @@ func buildGui() {
 				id_entry := widget.NewEntry()
 				title_entry := widget.NewEntry()
 				command := widget.NewMultiLineEntry()
+				id_entry.SetText(strconv.Itoa(getMaxScriptId() + 1))
 
 				items := []*widget.FormItem{
 					widget.NewFormItem("ID", id_entry),
@@ -193,7 +194,7 @@ func buildScriptsTab() {
 							refreshGui(0)
 						}
 					}, window)
-				form.Resize(fyne.NewSize(400, 200))
+				form.Resize(fyne.NewSize(400, 300))
 				form.Show()
 			}
 

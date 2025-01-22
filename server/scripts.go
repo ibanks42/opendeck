@@ -174,3 +174,14 @@ func getScriptsPath() string {
 	path := filepath.Dir(exe)
 	return filepath.Join(path, "scripts")
 }
+
+func getMaxScriptId() int {
+	scripts := getScripts()
+	maxId := 0
+	for _, v := range scripts {
+		if v.ID > maxId {
+			maxId = v.ID
+		}
+	}
+	return maxId
+}
