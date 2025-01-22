@@ -100,7 +100,7 @@ func buildScriptsTab() {
 	})
 	close_btn := widget.NewButtonWithIcon("", theme.WindowCloseIcon(), func() { os.Exit(0) })
 	btn_box := container.New(
-		layout.NewCustomPaddedLayout(0, 0, 4, 4),
+		layout.NewCustomPaddedLayout(4, 4, 4, 4),
 		container.NewHBox(
 			close_btn,
 			layout.NewSpacer(),
@@ -115,25 +115,27 @@ func buildScriptsTab() {
 	for _, s := range scripts {
 		title := strings.TrimSuffix(s, filepath.Ext(s))
 		button := widget.NewButton(title, func() {
-			resp, err := http.Get(url + "/scripts/" + s)
-			if err != nil {
-				connection_lbl.SetText(err.Error())
-				return
-			}
+			go func() {
+				resp, err := http.Get(url + "/scripts/" + s)
+				if err != nil {
+					connection_lbl.SetText(err.Error())
+					return
+				}
 
-			response, err := io.ReadAll(resp.Body)
-			if err != nil {
-				connection_lbl.SetText(err.Error())
-				return
-			}
+				response, err := io.ReadAll(resp.Body)
+				if err != nil {
+					connection_lbl.SetText(err.Error())
+					return
+				}
 
-			connection_lbl.SetText(title + ": " + string(response))
+				connection_lbl.SetText(title + ": " + string(response))
+			}()
 		})
 		layout := layout.NewCustomPaddedLayout(12, 12, 12, 12)
 		containers = append(containers, container.New(layout, button))
 	}
 
-	grid := container.NewGridWrap(fyne.NewSize(224, 224), containers...)
+	grid := container.NewGridWrap(fyne.NewSize(256, 192), containers...)
 	scroll := container.NewVScroll(grid)
 
 	tabs.Items[0].Content = container.NewBorder(btn_box, nil, nil, nil, scroll)

@@ -1,6 +1,10 @@
 package main
 
 import (
+	"path/filepath"
+	"sort"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
@@ -20,6 +24,13 @@ func StartServer() {
 		fiberApp.Use(cors.New())
 
 		fiberApp.Get("/scripts", func(c *fiber.Ctx) error {
+			scripts := getScripts()
+			sort.Slice(scripts, func(i, j int) bool {
+				return scripts[i].ID < scripts[j].ID
+			})
+			for i, v := range scripts {
+				scripts[i].File = strings.Replace(v.File, filepath.Ext(v.File), "", 0)
+			}
 			return c.JSON(getScripts())
 		})
 		fiberApp.Get("/scripts/:id", executeScript)

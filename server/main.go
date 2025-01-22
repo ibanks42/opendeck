@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"fmt"
 	"path/filepath"
+	"sort"
+	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -74,30 +76,39 @@ func buildGui() {
 	}
 
 	menu := fyne.NewMainMenu(
-		fyne.NewMenu("File", fyne.NewMenuItem("New Task", func() {
-			title_entry := widget.NewEntry()
-			command := widget.NewMultiLineEntry()
+		fyne.NewMenu("File",
+			fyne.NewMenuItem("Refresh", buildGui),
+			fyne.NewMenuItem("New Task", func() {
+				id_entry := widget.NewEntry()
+				title_entry := widget.NewEntry()
+				command := widget.NewMultiLineEntry()
 
-			items := []*widget.FormItem{
-				widget.NewFormItem("Title", title_entry),
-				widget.NewFormItem("Command", command),
-			}
+				items := []*widget.FormItem{
+					widget.NewFormItem("ID", id_entry),
+					widget.NewFormItem("Name", title_entry),
+					widget.NewFormItem("Script", command),
+				}
 
-			form := dialog.NewForm("Edit Task", "Confirm", "Cancel", items,
-				func(confirmed bool) {
-					if confirmed {
-						// _, err := createTask(title_entry.Text, command.Text)
-						// if err != nil {
-						// 	// TODO: Notify user?
-						// 	fmt.Println("Failed to update custom task", err.Error())
-						// }
+				form := dialog.NewForm("New Task", "Confirm", "Cancel", items,
+					func(confirmed bool) {
+						if confirmed {
+							id, err := strconv.Atoi(id_entry.Text)
+							if err != nil {
+								fmt.Println("Failed to create script: ID is not a number")
+								return
+							}
+							err = writeScript(id, title_entry.Text+".ts", command.Text)
+							if err != nil {
+								// TODO: Notify user?
+								fmt.Println("Failed to create script", err.Error())
+							}
 
-						refreshGui(1)
-					}
-				}, window)
-			form.Resize(fyne.NewSize(400, 200))
-			form.Show()
-		})))
+							refreshGui(0)
+						}
+					}, window)
+				form.Resize(fyne.NewSize(400, 300))
+				form.Show()
+			})))
 	window.SetMainMenu(menu)
 
 	refreshGui(0)
@@ -114,8 +125,11 @@ func refreshGui(tabIndex int) {
 
 func buildScriptsTab() {
 	scripts := getScripts()
+	sort.Slice(scripts, func(i, j int) bool {
+		return scripts[i].ID < scripts[j].ID
+	})
 
-	listmap := binding.NewStringList()
+	listmap := binding.NewUntypedList()
 	for _, script := range scripts {
 		listmap.Append(script)
 	}
@@ -133,36 +147,45 @@ func buildScriptsTab() {
 		},
 		// Update item
 		func(dataItem binding.DataItem, canvasObject fyne.CanvasObject) {
-			script, _ := dataItem.(binding.String).Get()
+			untyped, _ := dataItem.(binding.Untyped).Get()
+			script := untyped.(Script)
 			objects := canvasObject.(*fyne.Container).Objects
-			script_noext := strings.TrimSuffix(script, filepath.Ext(script))
+			script_noext := strings.TrimSuffix(script.File, filepath.Ext(script.File))
 
 			objects[0].(*widget.Label).SetText(script_noext)
 
 			// edit button
 			editBtn := objects[2].(*fyne.Container).Objects[0].(*widget.Button)
 			editBtn.OnTapped = func() {
-				task_data, err := readScript(script)
+				task_data, err := readScript(script.File)
 				if err != nil {
 					// TODO: Notify user
 					return
 				}
 
+				id_entry := widget.NewEntry()
 				filename_entry := widget.NewEntry()
 				command_entry := widget.NewMultiLineEntry()
 
-				filename_entry.SetText(script)
+				id_entry.SetText(strconv.Itoa(script.ID))
+				filename_entry.SetText(script.File)
 				command_entry.SetText(task_data)
 
 				items := []*widget.FormItem{
-					widget.NewFormItem("Title", filename_entry),
-					widget.NewFormItem("Command", command_entry),
+					widget.NewFormItem("ID", id_entry),
+					widget.NewFormItem("Name", filename_entry),
+					widget.NewFormItem("Script", command_entry),
 				}
 
 				form := dialog.NewForm("Edit Task", "Confirm", "Cancel", items,
 					func(confirmed bool) {
 						if confirmed {
-							err := writeScript(script, command_entry.Text)
+							id, err := strconv.Atoi(id_entry.Text)
+							if err != nil {
+								fmt.Println("Failed to update task: ID not a number")
+								return
+							}
+							err = updateScript(script, id, command_entry.Text)
 							if err != nil {
 								// TODO: Notify user?
 								fmt.Println("Failed to update custom task", err.Error())
