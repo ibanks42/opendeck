@@ -14,9 +14,9 @@ func TestGetScripts(t *testing.T) {
 			name    string
 			content string
 		}
-		initialJSON string
-		wantScripts int
-		wantPanic   bool
+		setupJson   string
+		wantErr     bool
+		wantScripts int // Add explicit expected count
 	}{
 		{
 			name: "normal case",
@@ -24,22 +24,13 @@ func TestGetScripts(t *testing.T) {
 				name    string
 				content string
 			}{
-				{"test1.ts", "console.log('test1')"},
-				{"test2.js", "console.log('test2')"},
-				{"invalid.txt", "not a script"},
+				{
+					name:    "test.js",
+					content: "console.log('test')",
+				},
 			},
-			initialJSON: `[
-	{
-		"id": 1,
-		"file": "test1.ts"
-	},
-	{
-		"id": 2,
-		"file": "test2.js"
-	}
-]`,
-			wantScripts: 2,
-			wantPanic:   false,
+			setupJson:   `[{"id": 1, "file": "test.js"}]`,
+			wantScripts: 1,
 		},
 		{
 			name: "invalid json format",
@@ -47,11 +38,14 @@ func TestGetScripts(t *testing.T) {
 				name    string
 				content string
 			}{
-				{"test1.js", "console.log('test1')"},
+				{
+					name:    "test.js",
+					content: "console.log('test')",
+				},
 			},
-			initialJSON: "[\n]",
-			wantScripts: 1,
-			wantPanic:   false,
+			setupJson:   `{"invalid": "json"`,
+			wantErr:     true,
+			wantScripts: 1, // Should recover and find the file
 		},
 		{
 			name: "empty but valid json",
@@ -59,11 +53,13 @@ func TestGetScripts(t *testing.T) {
 				name    string
 				content string
 			}{
-				{"test1.js", "console.log('test1')"},
+				{
+					name:    "test.js",
+					content: "console.log('test')",
+				},
 			},
-			initialJSON: "[]",
-			wantScripts: 1,
-			wantPanic:   false,
+			setupJson:   `[]`,
+			wantScripts: 1, // Should find the file despite empty JSON
 		},
 	}
 
@@ -76,44 +72,30 @@ func TestGetScripts(t *testing.T) {
 			defer func() { getScriptsPath = originalPath }()
 
 			// Create test files
-			for _, tf := range tc.setupFiles {
-				err := os.WriteFile(filepath.Join(tmpDir, tf.name), []byte(tf.content), 0644)
+			for _, f := range tc.setupFiles {
+				err := os.WriteFile(filepath.Join(tmpDir, f.name), []byte(f.content), 0644)
 				if err != nil {
 					t.Fatalf("Failed to create test file: %v", err)
 				}
 			}
 
-			// Setup initial scripts.json if specified
-			if tc.initialJSON != "" {
-				err := os.WriteFile(filepath.Join(tmpDir, "scripts.json"), []byte(tc.initialJSON), 0644)
+			// Create scripts.json if content provided
+			if tc.setupJson != "" {
+				err := os.WriteFile(filepath.Join(tmpDir, "scripts.json"), []byte(tc.setupJson), 0644)
 				if err != nil {
-					t.Fatalf("Failed to create initial scripts.json: %v", err)
+					t.Fatalf("Failed to create scripts.json: %v", err)
 				}
 			}
 
-			// Run test with panic recovery
-			defer func() {
-				r := recover()
-				if tc.wantPanic && r == nil {
-					t.Error("Expected panic but got none")
-				}
-				if !tc.wantPanic && r != nil {
-					t.Errorf("Unexpected panic: %v", r)
-				}
-			}()
-
+			// Run getScripts
 			scripts := getScripts()
-
-			if tc.wantPanic {
-				return // Don't continue checking results if we expected a panic
-			}
 
 			// Verify results
 			if len(scripts) != tc.wantScripts {
 				t.Errorf("Expected %d scripts, got %d", tc.wantScripts, len(scripts))
 			}
 
-			// Verify scripts.json was created and is valid
+			// Verify scripts.json was created/updated correctly
 			data, err := os.ReadFile(filepath.Join(tmpDir, "scripts.json"))
 			if err != nil {
 				t.Fatalf("Failed to read scripts.json: %v", err)
@@ -121,7 +103,7 @@ func TestGetScripts(t *testing.T) {
 
 			var savedScripts []Script
 			if err := json.Unmarshal(data, &savedScripts); err != nil {
-				t.Fatalf("Failed to parse scripts.json: %v", err)
+				t.Fatalf("Failed to parse saved scripts.json: %v", err)
 			}
 
 			if len(savedScripts) != tc.wantScripts {

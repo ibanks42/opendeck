@@ -4,185 +4,160 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"slices"
-	"strings"
-
-	"github.com/gofiber/fiber/v2"
 )
 
+// Script represents a task script with an ID and filename
 type Script struct {
 	ID   int    `json:"id"`
 	File string `json:"file"`
 }
 
 var getScriptsPath = func() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return ""
-	}
-	path := filepath.Dir(exe)
-	return filepath.Join(path, "scripts")
+	return filepath.Join(os.Getenv("HOME"), ".opendeck", "scripts")
 }
 
+func globExtensions(dir string, extensions []string) ([]string, error) {
+	var matches []string
+
+	for _, ext := range extensions {
+		pattern := filepath.Join(dir, "*"+ext)
+		files, err := filepath.Glob(pattern)
+		if err != nil {
+			return nil, err
+		}
+		matches = append(matches, files...)
+	}
+
+	return matches, nil
+}
+
+// getScripts reads and returns all available scripts
 func getScripts() []Script {
 	path := getScriptsPath()
-	files, err := os.ReadDir(path)
-	if err != nil {
-		log.Panic(err)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		os.MkdirAll(path, 0755)
 	}
 
-	// Try to read existing scripts.json
-	scriptsPath := filepath.Join(path, "scripts.json")
+	scripts_json := filepath.Join(path, "scripts.json")
+	if _, err := os.Stat(scripts_json); os.IsNotExist(err) {
+		// get all .js and .ts files in the path
+		files, err := globExtensions(path, []string{".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs"})
+		if err != nil {
+			log.Fatal(err)
+		}
+		scripts := make([]Script, len(files))
+		for i, file := range files {
+			scripts[i] = Script{
+				ID:   i + 1,
+				File: filepath.Base(file),
+			}
+		}
+		if err := writeScriptsJson(scripts); err != nil {
+			log.Fatal(err)
+		}
+		return scripts
+	}
+
+	data, err := os.ReadFile(scripts_json)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	var scripts []Script
-	maxID := 0
+	err = json.Unmarshal(data, &scripts)
 
-	data, err := os.ReadFile(scriptsPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			log.Panic(err)
-		}
-		// File doesn't exist, initialize empty scripts slice
-		scripts = []Script{}
-	} else {
-		// Parse existing scripts.json
-		if err := json.Unmarshal(data, &scripts); err != nil {
-			log.Panic(fmt.Errorf("invalid scripts.json format: %w", err))
-		}
-		if scripts == nil {
-			// Handle the case where JSON is valid but null or empty array
-			scripts = []Script{}
-		}
-		// Find highest ID
-		for _, script := range scripts {
-			if script.ID > maxID {
-				maxID = script.ID
+	if err != nil || len(scripts) == 0 {
+		files, _ := globExtensions(path, []string{".js", ".ts", ".jsx", ".tsx", ".mjs", ".cjs"})
+		scripts = make([]Script, len(files))
+		for i, file := range files {
+			scripts[i] = Script{
+				ID:   i + 1,
+				File: filepath.Base(file),
 			}
 		}
-	}
-
-	// Check each file in the scripts directory
-	for _, file := range files {
-		if file.IsDir() {
-			continue
+		if err := writeScriptsJson(scripts); err != nil {
+			log.Fatal(err)
 		}
-		ext := filepath.Ext(file.Name())
-		if ext != ".ts" && ext != ".js" {
-			continue
-		}
-
-		// Check if file exists in scripts
-		found := false
-		for _, script := range scripts {
-			if file.Name() == script.File {
-				found = true
-				break
-			}
-		}
-
-		// If not found, add new entry
-		if !found {
-			maxID++
-			newScript := Script{
-				File: file.Name(),
-				ID:   maxID,
-			}
-			scripts = append(scripts, newScript)
-		}
-	}
-
-	// Save updated scripts back to file
-	updatedData, err := json.MarshalIndent(scripts, "", "\t")
-	if err != nil {
-		log.Panic(err)
-	}
-
-	if err := os.WriteFile(scriptsPath, updatedData, 0644); err != nil {
-		log.Panic(err)
 	}
 
 	return scripts
 }
 
-func readScript(file string) (string, error) {
+// writeScript creates a new script file
+func writeScript(id int, filename string, content string) error {
 	path := getScriptsPath()
-	script := filepath.Join(path, file)
-	b, err := os.ReadFile(script)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
-
-func updateScript(script Script, id int, command string) error {
-	path := getScriptsPath()
-	json_path := filepath.Join(path, "scripts.json")
-	script_path := filepath.Join(path, script.File)
-
 	scripts := getScripts()
-	if slices.Contains(scripts, script) {
-		i := slices.Index(scripts, script)
-		scripts[i] = Script{
-			ID:   id,
-			File: script.File,
-		}
 
-		bytes, err := json.MarshalIndent(scripts, "", "\t")
-		if err != nil {
-			return err
-		}
-		if err := os.WriteFile(json_path, bytes, 0644); err != nil {
-			return err
-		}
+	// Check if ID already exists
+	if slices.ContainsFunc(scripts, func(s Script) bool { return s.ID == id }) {
+		return fmt.Errorf("script with ID %d already exists", id)
 	}
 
-	return os.WriteFile(script_path, []byte(command), 0644)
+	// Write script file
+	err := os.WriteFile(filepath.Join(path, filename), []byte(content), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write script file: %w", err)
+	}
+
+	// Update scripts.json
+	scripts = append(scripts, Script{ID: id, File: filename})
+	return writeScriptsJson(scripts)
 }
 
-func writeScript(id int, file, data string) error {
-	scripts := getScripts()
-	scripts = append(scripts, Script{ID: id, File: file})
-	// write json file
-
-	json, err := json.MarshalIndent(scripts, "", "\t")
-	if err != nil {
-		return err
-	}
-
-	err = os.WriteFile(filepath.Join(getScriptsPath(), "scripts.json"), json, 0644)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(filepath.Join(getScriptsPath(), file), []byte(data), 0644)
-}
-
-func executeScript(c *fiber.Ctx) error {
+// updateScript modifies an existing script
+func updateScript(script Script, newId int, content string) error {
 	path := getScriptsPath()
-	id := c.Params("id")
-	script, err := url.PathUnescape(filepath.Join(path, id))
+	scripts := getScripts()
+
+	// Remove old script from list
+	scripts = slices.DeleteFunc(scripts, func(s Script) bool {
+		return s.ID == script.ID
+	})
+
+	// Write updated script file
+	err := os.WriteFile(filepath.Join(path, script.File), []byte(content), 0644)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to write script file: %w", err)
 	}
 
-	proc := exec.Command("bun", "run", script)
-
-	output, err := proc.Output()
-	if err != nil {
-		fmt.Println("Error:", err)
-		return err
-	}
-
-	return c.SendString(strings.TrimSpace(string(output)))
+	// Update scripts.json with new ID
+	scripts = append(scripts, Script{ID: newId, File: script.File})
+	return writeScriptsJson(scripts)
 }
 
+// readScript reads the content of a script file
+func readScript(filename string) (string, error) {
+	path := getScriptsPath()
+	data, err := os.ReadFile(filepath.Join(path, filename))
+	if err != nil {
+		return "", fmt.Errorf("failed to read script file: %w", err)
+	}
+	return string(data), nil
+}
+
+// writeScriptsJson updates the scripts.json file
+func writeScriptsJson(scripts []Script) error {
+	path := getScriptsPath()
+	data, err := json.MarshalIndent(scripts, "", "\t")
+	if err != nil {
+		return fmt.Errorf("failed to marshal scripts: %w", err)
+	}
+
+	err = os.WriteFile(filepath.Join(path, "scripts.json"), data, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to write scripts.json: %w", err)
+	}
+
+	return nil
+}
+
+// getMaxScriptId returns the highest script ID
 func getMaxScriptId() int {
-	scripts := getScripts()
 	maxId := 0
-	for _, v := range scripts {
+	for _, v := range getScripts() {
 		if v.ID > maxId {
 			maxId = v.ID
 		}
