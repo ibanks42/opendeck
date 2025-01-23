@@ -19,6 +19,15 @@ type Script struct {
 	File string `json:"file"`
 }
 
+var getScriptsPath = func() string {
+	exe, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	path := filepath.Dir(exe)
+	return filepath.Join(path, "scripts")
+}
+
 func getScripts() []Script {
 	path := getScriptsPath()
 	files, err := os.ReadDir(path)
@@ -41,7 +50,11 @@ func getScripts() []Script {
 	} else {
 		// Parse existing scripts.json
 		if err := json.Unmarshal(data, &scripts); err != nil {
-			log.Panic(err)
+			log.Panic(fmt.Errorf("invalid scripts.json format: %w", err))
+		}
+		if scripts == nil {
+			// Handle the case where JSON is valid but null or empty array
+			scripts = []Script{}
 		}
 		// Find highest ID
 		for _, script := range scripts {
@@ -82,7 +95,7 @@ func getScripts() []Script {
 	}
 
 	// Save updated scripts back to file
-	updatedData, err := json.MarshalIndent(scripts, "", "    ")
+	updatedData, err := json.MarshalIndent(scripts, "", "\t")
 	if err != nil {
 		log.Panic(err)
 	}
@@ -117,7 +130,7 @@ func updateScript(script Script, id int, command string) error {
 			File: script.File,
 		}
 
-		bytes, err := json.MarshalIndent(scripts, "", "    ")
+		bytes, err := json.MarshalIndent(scripts, "", "\t")
 		if err != nil {
 			return err
 		}
@@ -134,7 +147,7 @@ func writeScript(id int, file, data string) error {
 	scripts = append(scripts, Script{ID: id, File: file})
 	// write json file
 
-	json, err := json.MarshalIndent(scripts, "", "    ")
+	json, err := json.MarshalIndent(scripts, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -164,15 +177,6 @@ func executeScript(c *fiber.Ctx) error {
 	}
 
 	return c.SendString(strings.TrimSpace(string(output)))
-}
-
-func getScriptsPath() string {
-	exe, err := os.Executable()
-	if err != nil {
-		return ""
-	}
-	path := filepath.Dir(exe)
-	return filepath.Join(path, "scripts")
 }
 
 func getMaxScriptId() int {
